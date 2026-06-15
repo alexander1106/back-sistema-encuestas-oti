@@ -145,9 +145,7 @@ public class DashboardService {
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Comparativo por escuela
-    // ─────────────────────────────────────────────────────────────────────────────
+  
     private List<ComparativoEscuelaDTO> calcularComparativoEscuela(List<Respuesta> respuestas) {
 
         // Solo ESCALA con valor parseable
