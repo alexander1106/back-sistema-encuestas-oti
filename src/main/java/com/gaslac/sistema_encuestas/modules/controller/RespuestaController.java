@@ -9,10 +9,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gaslac.sistema_encuestas.modules.dto.EncuestaCompletaDTO;
 import com.gaslac.sistema_encuestas.modules.dto.ExamenDTO;
+import com.gaslac.sistema_encuestas.modules.dto.ExportacionEncuestaDTO;
 import com.gaslac.sistema_encuestas.modules.dto.RespuestaDTO;
 import com.gaslac.sistema_encuestas.modules.dto.RespuestaUsuarioDTO;
 import com.gaslac.sistema_encuestas.modules.dto.ResultadoExamenDTO;
@@ -66,5 +68,21 @@ public List<Integer> obtenerEncuestasRespondidas(
             @PathVariable Integer id) {
 
         return encuestaService.obtenerEncuesta(id);
+    }
+
+    /**
+     * GET /api/respuestas/exportar/{idEncuesta}
+     *
+     * Devuelve las respuestas en bruto de una encuesta (dni, nombre, respuesta1, respuesta2...)
+     * listas para que el frontend arme el Excel. Filtros opcionales por facultad
+     * y/o escuela profesional para descargar solo los datos de una oficina/escuela puntual.
+     */
+    @GetMapping("/exportar/{idEncuesta}")
+    public ExportacionEncuestaDTO exportarRespuestas(
+            @PathVariable Integer idEncuesta,
+            @RequestParam(required = false) String facultad,
+            @RequestParam(required = false) String escuelaProfesional) {
+
+        return respuestaService.exportarRespuestasCrudas(idEncuesta, facultad, escuelaProfesional);
     }
 }

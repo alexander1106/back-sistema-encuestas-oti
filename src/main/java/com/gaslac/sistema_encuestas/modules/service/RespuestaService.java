@@ -1,6 +1,8 @@
 package com.gaslac.sistema_encuestas.modules.service;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -13,7 +15,10 @@ import org.springframework.web.server.ResponseStatusException;
 import com.gaslac.sistema_encuestas.modules.dto.ExamenCompletoDTO;
 import com.gaslac.sistema_encuestas.modules.dto.ExamenDTO;
 import com.gaslac.sistema_encuestas.modules.dto.ExamenPuntajeDTO;
+import com.gaslac.sistema_encuestas.modules.dto.ExportacionEncuestaDTO;
+import com.gaslac.sistema_encuestas.modules.dto.FilaExportacionDTO;
 import com.gaslac.sistema_encuestas.modules.dto.KpiExamenDTO;
+import com.gaslac.sistema_encuestas.modules.dto.PreguntaExportacionDTO;
 import com.gaslac.sistema_encuestas.modules.dto.PromedioCarreraDTO;
 import com.gaslac.sistema_encuestas.modules.dto.PuntajeItemDTO;
 import com.gaslac.sistema_encuestas.modules.dto.ReporteCompletoDTO;
@@ -532,4 +537,103 @@ return new ReporteCompletoDTO(
         carreras,
         kpi
 );
-}};
+}
+
+/**
+ * Exportación cruda de respuestas de una encuesta: dni, nombre, respuesta1, respuesta2...
+ * Filtros opcionales por facultad y/o escuela profesional (para descargar por "oficina").
+ */
+public ExportacionEncuestaDTO exportarRespuestasCrudas(
+        Integer idEncuesta,
+        String facultad,
+        String escuelaProfesional
+) {
+
+    List<Item> items = itemRepository.findByDimension_Encuesta_IdEncuesta(idEncuesta)
+            .stream()
+            .sorted(
+                    Comparator.<Item, Integer>comparing(i -> i.getDimension().getIdDimension())
+                            .thenComparing(Item::getNumero, Comparator.nullsLast(Comparator.naturalOrder()))
+                            .thenComparing(Item::getIdItem)
+            )
+            .toList();
+
+    List<PreguntaExportacionDTO> preguntas = items.stream()
+            .map(item -> new PreguntaExportacionDTO(
+                    item.getIdItem(),
+                    item.getNumero(),
+                    item.getTexto(),
+                    item.getDimension().getIdDimension(),
+                    item.getDimension().getNombre(),
+                    item.getDimension().getCodigo()
+            ))
+            .toList();
+
+    List<Respuesta> respuestas = respuestaRepository
+            .findByItem_Dimension_Encuesta_IdEncuesta(idEncuesta);
+
+    if (facultad != null && !facultad.isBlank()) {
+        respuestas = respuestas.stream()
+                .filter(r -> r.getUsuario().getFacultad() != null
+                        && r.getUsuario().getFacultad().equalsIgnoreCase(facultad))
+                .toList();
+    }
+
+    if (escuelaProfesional != null && !escuelaProfesional.isBlank()) {
+        respuestas = respuestas.stream()
+                .filter(r -> r.getUsuario().getEscuelaProfesional() != null
+                        && r.getUsuario().getEscuelaProfesional().equalsIgnoreCase(escuelaProfesional))
+                .toList();
+    }
+
+    Map<Integer, List<Respuesta>> respuestasPorUsuario = respuestas.stream()
+            .collect(Collectors.groupingBy(
+                    r -> r.getUsuario().getIdUsuario(),
+                    LinkedHashMap::new,
+                    Collectors.toList()
+            ));
+
+    List<FilaExportacionDTO> filas = respuestasPorUsuario.values().stream()
+            .map(respuestasUsuario -> {
+
+                Usuario usuario = respuestasUsuario.get(0).getUsuario();
+
+                Map<Integer, String> valorPorItem = respuestasUsuario.stream()
+                        .collect(Collectors.toMap(
+                                r -> r.getItem().getIdItem(),
+                                Respuesta::getValor,
+                                (a, b) -> b
+                        ));
+
+                List<String> valores = items.stream()
+                        .map(item -> valorPorItem.getOrDefault(item.getIdItem(), ""))
+                        .toList();
+
+                String nombreCompleto = String.join(" ",
+                        java.util.Objects.toString(usuario.getName(), ""),
+                        java.util.Objects.toString(usuario.getPaternalSurname(), ""),
+                        java.util.Objects.toString(usuario.getMaternalSurname(), "")
+                ).trim().replaceAll("\\s+", " ");
+
+                return new FilaExportacionDTO(
+                        usuario.getDni(),
+                        nombreCompleto,
+                        usuario.getFacultad(),
+                        usuario.getEscuelaProfesional(),
+                        valores
+                );
+            })
+            .toList();
+
+    String nombreEncuesta = items.isEmpty()
+            ? ""
+            : items.get(0).getDimension().getEncuesta().getNombre();
+
+    return new ExportacionEncuestaDTO(
+            idEncuesta,
+            nombreEncuesta,
+            preguntas,
+            filas
+    );
+}
+};
