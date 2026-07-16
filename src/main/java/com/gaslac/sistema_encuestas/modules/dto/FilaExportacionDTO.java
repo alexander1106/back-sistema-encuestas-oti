@@ -15,6 +15,7 @@ public class FilaExportacionDTO {
     private String nombreCompleto;
     private String facultad;
     private String escuelaProfesional;
+    private String fechaEgreso;
 
     /** Respuestas en el mismo orden que ExportacionEncuestaDTO.preguntas */
     private List<String> respuestas;

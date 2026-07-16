@@ -620,6 +620,7 @@ public ExportacionEncuestaDTO exportarRespuestasCrudas(
                         nombreCompleto,
                         usuario.getFacultad(),
                         usuario.getEscuelaProfesional(),
+                        usuario.getFechaEgreso(),
                         valores
                 );
             })
