@@ -621,6 +621,7 @@ public ExportacionEncuestaDTO exportarRespuestasCrudas(
                         usuario.getFacultad(),
                         usuario.getEscuelaProfesional(),
                         usuario.getFechaEgreso(),
+                        usuario.getSemestre_egreso(),
                         valores
                 );
             })

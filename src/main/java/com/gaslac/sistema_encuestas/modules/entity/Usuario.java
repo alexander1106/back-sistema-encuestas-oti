@@ -34,6 +34,6 @@ public class Usuario {
     private String facultad;
 
     private String fechaEgreso;
-    private String semestreEgreso;
+    private String semestre_egreso;
     
 }
