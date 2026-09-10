@@ -1,4 +1,5 @@
 package com.gaslac.sistema_encuestas.modules.repository;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,4 +27,28 @@ List<Integer> obtenerEncuestasRespondidas(
 );
 
 
+    interface EnvioResumen {
+        Integer getIdUsuario();
+        Integer getIdEncuesta();
+        LocalDateTime getUltimaRespuesta();
+    }
+
+    @Query("""
+        SELECT r.usuario.idUsuario AS idUsuario,
+               r.item.dimension.encuesta.idEncuesta AS idEncuesta,
+               MAX(r.fecha) AS ultimaRespuesta
+        FROM Respuesta r
+        GROUP BY r.usuario.idUsuario, r.item.dimension.encuesta.idEncuesta
+        """)
+    List<EnvioResumen> resumirEnvios();
+
+    @Query("""
+        SELECT r.usuario.idUsuario AS idUsuario,
+               r.item.dimension.encuesta.idEncuesta AS idEncuesta,
+               MAX(r.fecha) AS ultimaRespuesta
+        FROM Respuesta r
+        WHERE r.usuario.idUsuario = :idUsuario
+        GROUP BY r.usuario.idUsuario, r.item.dimension.encuesta.idEncuesta
+        """)
+    List<EnvioResumen> resumirEnviosPorUsuario(@Param("idUsuario") Integer idUsuario);
 }
