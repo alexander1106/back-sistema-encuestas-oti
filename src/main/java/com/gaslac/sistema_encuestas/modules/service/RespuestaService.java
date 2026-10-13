@@ -122,7 +122,6 @@ public ResultadoExamenDTO guardarExamen(ExamenDTO dto) {
             "idUsuario no puede ser nulo"
     );
 
-    // Obtener encuesta a partir del primer item
     Integer idPrimerItem = dto.getRespuestas().get(0).getIdItem();
 
     Item primerItem = itemRepository.findById(idPrimerItem)
@@ -135,7 +134,6 @@ public ResultadoExamenDTO guardarExamen(ExamenDTO dto) {
             .getEncuesta()
             .getIdEncuesta();
 
-    // Verificar si ya respondió
     boolean yaRespondio =
             respuestaRepository
                     .existsByUsuario_IdUsuarioAndItem_Dimension_Encuesta_IdEncuesta(
@@ -266,7 +264,6 @@ if (carrera != null && !carrera.isBlank()) {
                             List.of()
                     );
 
-            // Solo calcular métricas para preguntas ESCALA
             if (item.getTipo() != TipoItem.ESCALA) {
 
                 return new PuntajeItemDTO(
@@ -362,17 +359,13 @@ public ReporteCompletoDTO reporteCompleto(
         String carrera
 ) {
 
-    // 1. KPI
     KpiExamenDTO kpi = obtenerKpi(idEncuesta, carrera);
 
-    // 2. DETALLE POR PREGUNTA
     ExamenPuntajeDTO examen = obtenerPuntajePorExamen(idEncuesta, carrera);
 
-    // 3. PROMEDIO POR CARRERA (YA VIENE LIMPIO)
     List<PromedioCarreraDTO> carreras =
             obtenerPromedioPorCarrera(idEncuesta, carrera);
 
-    // 4. RESPONSE FINAL
     return new ReporteCompletoDTO(
             examen,
             carreras,
@@ -400,14 +393,8 @@ public ReporteCompletoDTO reporteCompleto(
 
 public ReporteCompletoDTO reporteGlobal(String carrera) {
 
-    // =========================
-    // 1. TRAER RESPUESTAS
-    // =========================
     List<Respuesta> respuestas = respuestaRepository.findAll();
 
-    // =========================
-    // 2. FILTRO POR CARRERA
-    // =========================
     if (carrera != null && !carrera.isBlank()) {
         respuestas = respuestas.stream()
                 .filter(r -> r.getUsuario().getEscuelaProfesional() != null
@@ -432,7 +419,7 @@ double promedio = respuestas.stream()
 
     int totalRespuestas = respuestas.size();
 
-    double puntajeMaximo = 5.0; // escala Likert fija (CORRECTO)
+    double puntajeMaximo = 5.0;
 
     long participantes = respuestas.stream()
             .map(r -> r.getUsuario().getIdUsuario())
@@ -446,9 +433,6 @@ double promedio = respuestas.stream()
             3.0,
             participantes
     );
-// =========================
-// 📊 PROMEDIO POR CARRERA
-// =========================
 Map<String, List<Respuesta>> porCarrera = respuestas.stream()
         .filter(r -> r.getUsuario() != null)
         .collect(Collectors.groupingBy(r ->
@@ -474,9 +458,6 @@ List<PromedioCarreraDTO> carreras = porCarrera.entrySet()
         ))
         .toList();
 
-// =========================
-// 📌 DETALLE GLOBAL POR ITEM
-// =========================
 Map<Integer, List<Respuesta>> porItem = respuestas.stream()
         .collect(Collectors.groupingBy(r -> r.getItem().getIdItem()));
 
@@ -493,7 +474,6 @@ ExamenPuntajeDTO examen = new ExamenPuntajeDTO(
             List<Respuesta> resItem =
                     porItem.getOrDefault(item.getIdItem(), List.of());
 
-            // Si no es ESCALA no calculamos promedio
             if (item.getTipo() != TipoItem.ESCALA) {
 
                 return new PuntajeItemDTO(
@@ -529,9 +509,6 @@ ExamenPuntajeDTO examen = new ExamenPuntajeDTO(
         }).toList()
 );
 
-// =========================
-// 4. RESPONSE FINAL
-// =========================
 return new ReporteCompletoDTO(
         examen,
         carreras,
@@ -539,10 +516,6 @@ return new ReporteCompletoDTO(
 );
 }
 
-/**
- * Exportación cruda de respuestas de una encuesta: dni, nombre, respuesta1, respuesta2...
- * Filtros opcionales por facultad y/o escuela profesional (para descargar por "oficina").
- */
 public ExportacionEncuestaDTO exportarRespuestasCrudas(
         Integer idEncuesta,
         String facultad,

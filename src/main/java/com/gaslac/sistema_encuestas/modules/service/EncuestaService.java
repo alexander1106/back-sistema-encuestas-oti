@@ -37,7 +37,7 @@ public class EncuestaService {
         i.getIdItem(),
         i.getNumero(),
         i.getTexto(),
-        i.getTipo() // 👈 ESTE CAMPO
+        i.getTipo()
 ))
                             .toList();
 

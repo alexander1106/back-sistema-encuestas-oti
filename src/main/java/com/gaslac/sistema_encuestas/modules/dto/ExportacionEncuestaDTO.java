@@ -14,7 +14,6 @@ public class ExportacionEncuestaDTO {
     private Integer idEncuesta;
     private String nombreEncuesta;
 
-    /** Cabeceras de pregunta (con su dimensión), en orden (respuesta1, respuesta2, ...) */
     private List<PreguntaExportacionDTO> preguntas;
 
     private List<FilaExportacionDTO> filas;

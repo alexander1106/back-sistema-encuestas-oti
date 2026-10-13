@@ -70,13 +70,6 @@ public List<Integer> obtenerEncuestasRespondidas(
         return encuestaService.obtenerEncuesta(id);
     }
 
-    /**
-     * GET /api/respuestas/exportar/{idEncuesta}
-     *
-     * Devuelve las respuestas en bruto de una encuesta (dni, nombre, respuesta1, respuesta2...)
-     * listas para que el frontend arme el Excel. Filtros opcionales por facultad
-     * y/o escuela profesional para descargar solo los datos de una oficina/escuela puntual.
-     */
     @GetMapping("/exportar/{idEncuesta}")
     public ExportacionEncuestaDTO exportarRespuestas(
             @PathVariable Integer idEncuesta,

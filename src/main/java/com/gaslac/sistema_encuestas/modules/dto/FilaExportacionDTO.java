@@ -18,6 +18,5 @@ public class FilaExportacionDTO {
     private String fechaEgreso;
     private String semestre_egreso;
 
-    /** Respuestas en el mismo orden que ExportacionEncuestaDTO.preguntas */
     private List<String> respuestas;
 }

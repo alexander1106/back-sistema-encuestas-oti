@@ -33,14 +33,12 @@ public class DashboardService {
     private final EncuestaRepository encuestaRepository;
     private final UsuarioRepository usuarioRepository;
 
-    // Categorías de sentimiento en orden fijo
     private static final List<String> CATEGORIAS_SENTIMIENTO = List.of(
             "Muy Satisfecho", "Satisfecho", "Neutral", "Insatisfecho", "Muy Insatisfecho"
     );
 
     public DashboardResponseDTO obtenerDashboard(Integer idEncuesta, String facultad) {
 
-        // ── 1. Validar encuesta si se proporcionó ──────────────────────────────────
         if (idEncuesta != null) {
             encuestaRepository.findById(idEncuesta)
                     .orElseThrow(() -> new ResponseStatusException(
@@ -49,7 +47,6 @@ public class DashboardService {
                     ));
         }
 
-        // ── 2. Obtener respuestas base ─────────────────────────────────────────────
         List<Respuesta> respuestas;
         if (idEncuesta != null) {
             respuestas = respuestaRepository.findByItem_Dimension_Encuesta_IdEncuesta(idEncuesta);
@@ -57,10 +54,7 @@ public class DashboardService {
             respuestas = respuestaRepository.findAll();
         }
 
-        // ── 3. Filtro por escuela profesional (parámetro: facultad) ───────────────
         if (facultad != null && !facultad.isBlank()) {
-            // Normalizar: quitar acentos y comparar en minúsculas para evitar
-            // problemas de encoding con tildes y ñ (ej. INGENIERÍA vs INGENIERIA)
             final String escuelaNorm = normalizarTexto(facultad);
             respuestas = respuestas.stream()
                     .filter(r -> r.getUsuario() != null
@@ -69,12 +63,10 @@ public class DashboardService {
                     .collect(Collectors.toList());
         }
 
-        // ── 4. Respuesta vacía ─────────────────────────────────────────────────────
         if (respuestas.isEmpty()) {
             return buildEmptyResponse();
         }
 
-        // ── 5. Calcular secciones ──────────────────────────────────────────────────
         KpiDashboardDTO kpis = calcularKpis(respuestas);
         List<ComparativoEscuelaDTO> comparativo = calcularComparativoEscuela(respuestas);
         List<SentimientoDTO> sentimiento = calcularDistribucionSentimiento(respuestas);
@@ -83,27 +75,20 @@ public class DashboardService {
         return new DashboardResponseDTO(kpis, comparativo, sentimiento, ranking);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // KPIs
-    // ─────────────────────────────────────────────────────────────────────────────
     private KpiDashboardDTO calcularKpis(List<Respuesta> respuestas) {
 
-        // Total respuestas (todos los tipos)
         int totalRespuestas = respuestas.size();
 
-        // Egresados encuestados (usuarios distintos)
         int egresadosEncuestados = (int) respuestas.stream()
                 .map(r -> r.getUsuario().getIdUsuario())
                 .distinct()
                 .count();
 
-        // Tasa de participación: egresados con respuesta / total usuarios en el sistema
         long totalUsuariosSistema = usuarioRepository.count();
         double tasaParticipacion = totalUsuariosSistema > 0
                 ? redondear((egresadosEncuestados * 100.0) / totalUsuariosSistema)
                 : 0.0;
 
-        // Respuestas ESCALA con valor parseable [1-5]
         List<Respuesta> escalaValidas = respuestas.stream()
                 .filter(r -> r.getItem().getTipo() == TipoItem.ESCALA)
                 .filter(r -> parsearEscala(r.getValor()) != null)
@@ -116,7 +101,6 @@ public class DashboardService {
             );
         }
 
-        // Promedio general de satisfacción
         double promedioSatisfaccion = redondear(
                 escalaValidas.stream()
                         .mapToInt(r -> parsearEscala(r.getValor()))
@@ -124,7 +108,6 @@ public class DashboardService {
                         .orElse(0.0)
         );
 
-        // Promedio por escuela para mejor/peor
         Map<String, Double> promediosPorEscuela = calcularPromediosPorEscuela(escalaValidas);
 
         String mejorEscuela = promediosPorEscuela.entrySet().stream()
@@ -148,7 +131,6 @@ public class DashboardService {
   
     private List<ComparativoEscuelaDTO> calcularComparativoEscuela(List<Respuesta> respuestas) {
 
-        // Solo ESCALA con valor parseable
         Map<String, List<Respuesta>> porEscuela = respuestas.stream()
                 .filter(r -> r.getItem().getTipo() == TipoItem.ESCALA)
                 .filter(r -> parsearEscala(r.getValor()) != null)
@@ -168,19 +150,14 @@ public class DashboardService {
                     );
                     return new ComparativoEscuelaDTO(entry.getKey(), prom, grupo.size());
                 })
-                // Ordenar de mayor a menor promedio, empate → alfabético ascendente
                 .sorted(Comparator.<ComparativoEscuelaDTO>comparingDouble(ComparativoEscuelaDTO::getPromedioSatisfaccion)
                         .reversed()
                         .thenComparing(ComparativoEscuelaDTO::getEscuelaProfesional))
                 .collect(Collectors.toList());
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Distribución de sentimiento
-    // ─────────────────────────────────────────────────────────────────────────────
     private List<SentimientoDTO> calcularDistribucionSentimiento(List<Respuesta> respuestas) {
 
-        // Promedio individual por egresado (solo ESCALA parseables)
         Map<Integer, List<Integer>> escalasPorUsuario = respuestas.stream()
                 .filter(r -> r.getItem().getTipo() == TipoItem.ESCALA)
                 .filter(r -> parsearEscala(r.getValor()) != null)
@@ -189,18 +166,15 @@ public class DashboardService {
                         Collectors.mapping(r -> parsearEscala(r.getValor()), Collectors.toList())
                 ));
 
-        // Egresados que sí tienen respuestas ESCALA válidas
         List<Double> promediosIndividuales = escalasPorUsuario.values().stream()
                 .map(vals -> vals.stream().mapToInt(Integer::intValue).average().orElse(0.0))
                 .collect(Collectors.toList());
 
         long total = promediosIndividuales.size();
 
-        // Contar por categoría
         Map<String, Long> conteo = promediosIndividuales.stream()
                 .collect(Collectors.groupingBy(this::clasificarSentimiento, Collectors.counting()));
 
-        // Construir lista con las 5 categorías siempre presentes
         List<SentimientoDTO> resultado = new ArrayList<>();
         for (String cat : CATEGORIAS_SENTIMIENTO) {
             double porcentaje = total > 0
@@ -211,12 +185,8 @@ public class DashboardService {
         return resultado;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Ranking de calidad por pregunta
-    // ─────────────────────────────────────────────────────────────────────────────
 private List<RankingPreguntaDTO> calcularRankingPreguntas(List<Respuesta> respuestas) {
 
-    // Solo preguntas tipo ESCALA con respuestas válidas
     Map<Integer, List<Respuesta>> porItem = respuestas.stream()
             .filter(r -> r.getItem() != null)
             .filter(r -> r.getItem().getTipo() == TipoItem.ESCALA)
@@ -228,7 +198,6 @@ private List<RankingPreguntaDTO> calcularRankingPreguntas(List<Respuesta> respue
 
                 List<Respuesta> grupo = entry.getValue();
 
-                // Todas las respuestas pertenecen al mismo item
                 com.gaslac.sistema_encuestas.modules.entity.Item item =
                         grupo.get(0).getItem();
 
@@ -269,11 +238,7 @@ private List<RankingPreguntaDTO> calcularRankingPreguntas(List<Respuesta> respue
             .collect(Collectors.toList());
 }
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────────
 
-    /** Parsea el valor de una respuesta ESCALA. Retorna null si es inválido o fuera de [1,5]. */
     private Integer parsearEscala(String valor) {
         if (valor == null) return null;
         try {
@@ -284,7 +249,6 @@ private List<RankingPreguntaDTO> calcularRankingPreguntas(List<Respuesta> respue
         }
     }
 
-    /** Clasifica el promedio individual de un egresado en una categoría de sentimiento. */
     private String clasificarSentimiento(double promedio) {
         if (promedio >= 4.5) return "Muy Satisfecho";
         if (promedio >= 3.5) return "Satisfecho";
@@ -293,7 +257,6 @@ private List<RankingPreguntaDTO> calcularRankingPreguntas(List<Respuesta> respue
         return "Muy Insatisfecho";
     }
 
-    /** Asigna el estado de calidad a un ítem según su promedio. */
     private String clasificarEstadoItem(double promedio) {
         if (promedio >= 4.5) return "Excelente";
         if (promedio >= 3.5) return "Bueno";
@@ -301,7 +264,6 @@ private List<RankingPreguntaDTO> calcularRankingPreguntas(List<Respuesta> respue
         return "Crítico";
     }
 
-    /** Calcula el promedio de satisfacción por escuela (para mejor/peor). */
     private Map<String, Double> calcularPromediosPorEscuela(List<Respuesta> escalaValidas) {
         Map<String, List<Integer>> porEscuela = escalaValidas.stream()
                 .collect(Collectors.groupingBy(
@@ -319,27 +281,19 @@ private List<RankingPreguntaDTO> calcularRankingPreguntas(List<Respuesta> respue
                 ));
     }
 
-    /** Redondea un double a 2 decimales con half-up. */
     private double redondear(double valor) {
         return BigDecimal.valueOf(valor)
                 .setScale(2, RoundingMode.HALF_UP)
                 .doubleValue();
     }
 
-    /**
-     * Normaliza un texto para comparación robusta:
-     * convierte a minúsculas y elimina diacríticos (tildes, ñ → n, etc.)
-     * Así "INGENIERÍA" y "INGENIERIA" se comparan igual.
-     */
     private String normalizarTexto(String texto) {
         if (texto == null) return "";
         String lower = texto.toLowerCase();
-        // Descomponer caracteres Unicode y quitar marcas diacríticas
         String normalized = java.text.Normalizer.normalize(lower, java.text.Normalizer.Form.NFD);
         return normalized.replaceAll("\\p{InCombiningDiacriticalMarks}", "");
     }
 
-    /** Construye la respuesta vacía cuando no hay datos. */
     private DashboardResponseDTO buildEmptyResponse() {
         List<SentimientoDTO> sentimientoVacio = CATEGORIAS_SENTIMIENTO.stream()
                 .map(cat -> new SentimientoDTO(cat, 0.00))
